@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>로딩 화면</title>
+<style>
+  :root { --bg:#00030b; --line:#00b4ff; --text:#bfeaff; box-sizing:border-box; }
+  html,body { height:100%; margin:0; background:var(--bg); }
+  body { display:flex; align-items:center; justify-content:center; overflow:hidden;
+    font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif; }
+  .stage { position:relative; width:min(100vw, calc(100vh * 1662 / 946)); aspect-ratio:1662/946;
+    container-type:inline-size; cursor:pointer;
+    background:radial-gradient(ellipse at 50% 50%, #00122b 0%, var(--bg) 70%); }
+  svg.frame { position:absolute; inset:0; width:100%; height:100%; }
+  .glowline { fill:none; stroke:var(--line); stroke-width:5; stroke-linejoin:miter;
+    filter:drop-shadow(0 0 6px #00b4ff) drop-shadow(0 0 16px #0077ff); }
+  .deco { fill:#0a3f78; opacity:.45; }
+  .title { position:absolute; left:0; right:0; top:19.5%; text-align:center; color:#e6f7ff;
+    font-weight:700; font-size:5.2cqw; letter-spacing:.02em;
+    text-shadow:0 0 8px #00b4ff, 0 0 20px #0080ff; }
+  .bar { position:absolute; left:24.07%; width:51.9%; top:48.5%; height:7.4%;
+    border:.4cqw solid #0a9bff; box-sizing:border-box;
+    box-shadow:0 0 14px rgba(0,150,255,.55), inset 0 0 14px rgba(0,150,255,.25); }
+  .fill { height:100%; width:0%; background:linear-gradient(90deg,#0066d6,#00c8ff);
+    box-shadow:0 0 18px #00b4ff; }
+  .pct { position:absolute; left:0; right:0; top:56.5%; text-align:center; color:var(--text);
+    font-size:3.2cqw; font-weight:500; text-shadow:0 0 10px #00b4ff; font-variant-numeric:tabular-nums; }
+  .hint { position:absolute; left:0; right:0; top:66%; text-align:center; color:#e6f7ff;
+    font-size:2.4cqw; font-weight:500; opacity:0; text-shadow:0 0 10px #00b4ff; }
+  .hint.show { opacity:1; animation:blink 1.2s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity:.25; } }
+  .stage { transition:opacity .6s; }
+  .stage.out { opacity:0; pointer-events:none; }
+  #game { position:fixed; inset:0; overflow:hidden; background:#000; display:none; opacity:0; transition:opacity .8s; }
+  #game.on { display:block; }
+  #game canvas { display:block; touch-action:none; }
+  #game.vis { opacity:1; }
+  #view { position:absolute; inset:0; transform-origin:58% 55%; will-change:transform; }
+  #view img { width:100%; height:100%; object-fit:cover; display:block; user-select:none; -webkit-user-drag:none; }
+  #help { position:absolute; left:0; right:0; top:max(18px, env(safe-area-inset-top, 0px)); text-align:center; color:#fff;
+    font:500 15px "Noto Sans KR","Malgun Gothic",sans-serif; text-shadow:0 1px 6px rgba(0,0,0,.7); transition:opacity 1s; }
+  #pad { position:absolute; left:20px; bottom:max(20px, env(safe-area-inset-bottom, 0px)); display:none;
+    grid-template-columns:repeat(3,56px); grid-template-rows:repeat(2,56px); gap:6px; touch-action:none; }
+  #pad button { border:0; border-radius:12px; background:rgba(0,0,0,.45); color:#fff; font:700 18px sans-serif; touch-action:none; }
+  #pad button[data-k="KeyW"] { grid-column:2; grid-row:1; }
+  #pad button[data-k="KeyA"] { grid-column:1; grid-row:2; }
+  #pad button[data-k="KeyS"] { grid-column:2; grid-row:2; }
+  #pad button[data-k="KeyD"] { grid-column:3; grid-row:2; }
+  /* 하단 아이템 바 스타일 */
+  #hotbar { position:absolute; left:50%; bottom:max(20px, env(safe-area-inset-bottom, 0px)); transform:translateX(-50%);
+    display:flex; gap:8px; padding:8px; border-radius:16px; background:rgba(10,18,32,.62);
+    border:1.5px solid rgba(255,255,255,.22); backdrop-filter:blur(6px); z-index:20; user-select:none; }
+  .slot { position:relative; width:56px; height:56px; border-radius:12px; background:rgba(255,255,255,.08);
+    border:2px solid rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:transform .12s, border-color .15s, background .15s, box-shadow .15s; }
+  .slot:hover { background:rgba(255,255,255,.16); }
+  .slot.active { border-color:#00c8ff; background:rgba(0,180,255,.22);
+    box-shadow:0 0 14px rgba(0,200,255,.65); transform:translateY(-3px); }
+  .slot .num { position:absolute; top:4px; left:7px; font:700 11px sans-serif; color:rgba(255,255,255,.75); }
+  .slot svg { width:36px; height:36px; filter:drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+  /* 낚시 던지기/감기 액션 버튼 */
+  #fishBtn { position:absolute; right:28px; bottom:max(28px, env(safe-area-inset-bottom, 0px));
+    padding:14px 26px; border-radius:999px; border:2px solid #7ce2ff;
+    background:linear-gradient(135deg, rgba(0,114,255,.88), rgba(0,198,255,.88));
+    color:#fff; font:700 17px "Noto Sans KR","Malgun Gothic",sans-serif; letter-spacing:.04em;
+    box-shadow:0 4px 18px rgba(0,180,255,.55), inset 0 1px 0 rgba(255,255,255,.4);
+    cursor:pointer; display:none; z-index:25; user-select:none; touch-action:none;
+    transition:transform .12s, box-shadow .15s, background .15s; }
+  #fishBtn:hover { transform:scale(1.05); box-shadow:0 6px 24px rgba(0,210,255,.8); }
+  #fishBtn:active { transform:scale(0.96); }
+  #fishBtn.casting { border-color:#ffd166; background:linear-gradient(135deg, rgba(230,110,0,.9), rgba(255,175,0,.9));
+    box-shadow:0 4px 18px rgba(255,165,0,.6); }
+  /* 낚시 미니게임 UI (Fisch 스타일) */
+  #fishGame { position:absolute; left:50%; bottom:max(14%, 72px); transform:translateX(-50%);
+    width:min(540px, 90vw); display:none; flex-direction:column; align-items:center; gap:10px;
+    z-index:40; user-select:none; touch-action:none; }
+  .fg-track-wrap { position:relative; width:100%; height:44px; background:#232830;
+    border:3px solid #d4dae3; border-radius:6px; box-shadow:0 8px 26px rgba(0,0,0,.75);
+    display:flex; align-items:center; padding:0 8px; box-sizing:border-box; }
+  .fg-inner { position:relative; width:100%; height:24px; background:#0d1015; border-radius:3px; overflow:visible; }
+  .fg-white { position:absolute; top:-3px; height:30px; width:28%; left:36%; background:#f7f8fa;
+    border-radius:3px; box-shadow:0 0 12px rgba(255,255,255,.55);
+    display:flex; align-items:center; justify-content:space-between; padding:0 8px; box-sizing:border-box; }
+  .fg-white span { color:#4a515c; font:900 14px sans-serif; line-height:1; }
+  .fg-gray { position:absolute; top:-8px; width:7px; height:40px; left:50%; transform:translateX(-50%);
+    background:#484f59; border:1.5px solid #16191e; border-radius:2px;
+    box-shadow:0 0 6px rgba(0,0,0,.8); z-index:3; }
+  .fg-gray::before { content:''; position:absolute; top:-7px; left:50%; transform:translateX(-50%);
+    width:8px; height:5px; border:2px solid #484f59; border-bottom:0; border-radius:4px 4px 0 0; }
+  .fg-prog-wrap { width:76%; height:11px; background:#14181f; border:2px solid #8c96a6;
+    border-radius:4px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,.6); }
+  .fg-prog-fill { width:25%; height:100%; background:linear-gradient(90deg, #9aa4b2, #ffffff);
+    box-shadow:0 0 8px rgba(255,255,255,.7); }
+  .fg-tip { color:#fff; font:600 13px "Noto Sans KR","Malgun Gothic",sans-serif;
+    text-shadow:0 1px 4px rgba(0,0,0,.85); opacity:.9; }
+  /* 물고기 획득 알림 배너 */
+  #catchToast { position:absolute; left:50%; top:22%; transform:translate(-50%, -10px);
+    padding:14px 28px; border-radius:16px; background:rgba(12,24,44,.86);
+    border:2px solid #00c8ff; color:#fff; font:700 19px "Noto Sans KR","Malgun Gothic",sans-serif;
+    box-shadow:0 0 24px rgba(0,200,255,.65); opacity:0; pointer-events:none;
+    transition:opacity .3s, transform .3s; z-index:50; text-align:center; }
+  #catchToast.show { opacity:1; transform:translate(-50%, 0); }
+  /* 좌측 상단 재화 및 물고기 판매 UI */
+  #shopHud { position:absolute; left:18px; top:max(18px, env(safe-area-inset-top, 0px));
+    display:flex; flex-direction:column; gap:8px; z-index:30; user-select:none; }
+  .hud-stats { display:flex; gap:10px; padding:8px 14px; border-radius:12px;
+    background:rgba(10,18,32,.68); border:1.5px solid rgba(255,255,255,.22);
+    backdrop-filter:blur(6px); color:#fff; font:700 14px "Noto Sans KR","Malgun Gothic",sans-serif; }
+  #sellBtn { padding:10px 16px; border-radius:12px; border:1.5px solid #ffd166;
+    background:linear-gradient(135deg, rgba(235,140,0,.92), rgba(255,190,11,.92));
+    color:#1c1300; font:800 14px "Noto Sans KR","Malgun Gothic",sans-serif;
+    box-shadow:0 4px 14px rgba(255,180,0,.45); cursor:pointer; display:none;
+    transition:transform .12s, box-shadow .15s; text-align:center; }
+  #sellBtn:hover { transform:scale(1.04); box-shadow:0 6px 18px rgba(255,200,0,.7); }
+  #sellBtn:active { transform:scale(0.96); }
+  /* NPC 말걸기 버튼 및 대화창 */
+  #talkBtn { position:absolute; left:50%; bottom:max(96px, calc(env(safe-area-inset-bottom, 0px) + 88px));
+    transform:translateX(-50%); padding:12px 24px; border-radius:999px; border:2px solid #ff6b6b;
+    background:linear-gradient(135deg, rgba(160,20,35,.92), rgba(220,45,65,.92));
+    color:#fff; font:700 16px "Noto Sans KR","Malgun Gothic",sans-serif;
+    box-shadow:0 4px 18px rgba(220,30,50,.65); cursor:pointer; display:none; z-index:26; user-select:none; }
+  #npcDialog { position:absolute; left:50%; bottom:max(105px, calc(env(safe-area-inset-bottom, 0px) + 95px));
+    transform:translateX(-50%); width:min(420px, 88vw); padding:18px 20px; border-radius:16px;
+    background:rgba(20,10,16,.92); border:2px solid #c92a3e; color:#fff;
+    box-shadow:0 10px 30px rgba(0,0,0,.8); display:none; flex-direction:column; gap:12px; z-index:45; }
+  .npc-name { font:800 16px "Noto Sans KR","Malgun Gothic",sans-serif; color:#ff6b7a; }
+  .npc-text { font:500 14px/1.5 "Noto Sans KR","Malgun Gothic",sans-serif; color:#f2e6e8; }
+  .npc-btns { display:flex; gap:8px; justify-content:flex-end; }
+  .npc-btns button { padding:8px 16px; border-radius:10px; border:0; font:700 14px "Noto Sans KR","Malgun Gothic",sans-serif; cursor:pointer; }
+  #npcPayBtn { background:linear-gradient(135deg, #d62839, #ff4d5e); color:#fff; box-shadow:0 2px 10px rgba(220,40,60,.5); }
+  #npcCloseBtn { background:rgba(255,255,255,.15); color:#ddd; }
+  /* 상단 특별 획득 배너 */
+  #specialBanner { position:absolute; left:50%; top:11%; transform:translate(-50%, -12px);
+    padding:14px 32px; border-radius:14px; background:rgba(30,6,12,.92);
+    border:2.5px solid #ff2a4b; color:#ffccd5; font:900 22px "Noto Sans KR","Malgun Gothic",sans-serif;
+    text-shadow:0 0 12px #ff1e42, 0 0 24px #b3001b; box-shadow:0 0 28px rgba(255,30,66,.75);
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:60; white-space:nowrap; }
+  #specialBanner.show { opacity:1; transform:translate(-50%, 0); }
+  /* 붉은 참격 베기 이펙트 */
+  .fg-slash { position:absolute; left:-8%; top:50%; width:116%; height:6px;
+    background:linear-gradient(90deg, transparent 0%, #ff1a3c 18%, #ffffff 50%, #ff1a3c 82%, transparent 100%);
+    box-shadow:0 0 14px #ff002b, 0 0 28px #ff1a3c;
+    transform:translateY(-50%) rotate(-5deg) scaleX(0); opacity:0; pointer-events:none; z-index:10; }
+  .fg-slash.active { animation:slashCut 0.55s cubic-bezier(.15,.85,.25,1) forwards; }
+  @keyframes slashCut {
+    0% { opacity:1; transform:translateY(-50%) rotate(-5deg) scaleX(0); }
+    35% { opacity:1; transform:translateY(-50%) rotate(-5deg) scaleX(1.06); }
+    100% { opacity:0; transform:translateY(-50%) rotate(-5deg) scaleX(1.12); }
+  }
+  /* 보스 물고기 노란색 기둥 공격 이펙트 */
+  .fg-pillar-warn { position:absolute; top:-22px; width:16px; height:88px; transform:translateX(-50%);
+    background:rgba(255, 225, 40, 0.22); border:1.5px dashed #ffe600; border-radius:4px;
+    pointer-events:none; z-index:4; animation:pillarWarnPulse .35s infinite alternate; }
+  .fg-pillar { position:absolute; top:-34px; width:20px; height:112px; transform:translateX(-50%);
+    background:linear-gradient(180deg, #fff799 0%, #ffd000 50%, #ff9900 100%);
+    box-shadow:0 0 18px #ffdd00, 0 0 32px #ffaa00; border-radius:4px;
+    pointer-events:none; z-index:9; animation:pillarStrike .45s ease-out forwards; }
+  @keyframes pillarWarnPulse { from { opacity:.35; } to { opacity:.9; } }
+  @keyframes pillarStrike {
+    0% { opacity:1; transform:translateX(-50%) scaleY(0.15); }
+    35% { opacity:1; transform:translateX(-50%) scaleY(1.08); }
+    100% { opacity:0; transform:translateX(-50%) scaleY(1); }
+  }
+  @media (max-width:600px) {
+    #hotbar { gap:6px; padding:6px; bottom:max(14px, env(safe-area-inset-bottom, 0px)); }
+    .slot { width:46px; height:46px; }
+    .slot svg { width:28px; height:28px; }
+    #pad { bottom:max(82px, calc(env(safe-area-inset-bottom, 0px) + 74px)); }
+    #fishBtn { right:18px; bottom:max(86px, calc(env(safe-area-inset-bottom, 0px) + 78px)); padding:12px 20px; font-size:15px; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <svg class="frame" viewBox="0 0 1662 946" preserveAspectRatio="none" aria-hidden="true">
+    <polyline class="glowline" points="0,32 215,36 277,72 565,72 620,35 1045,35 1098,72 1385,72 1448,36 1662,33"/>
+    <polyline class="glowline" points="0,893 218,895 282,860 566,860 618,897 1045,897 1098,860 1382,860 1445,897 1662,895"/>
+    <polygon class="deco" points="70,50 125,50 70,172 15,172"/>
+    <polygon class="deco" points="145,50 200,50 145,172 90,172"/>
+    <polygon class="deco" points="1470,50 1525,50 1580,172 1525,172"/>
+    <polygon class="deco" points="1545,50 1600,50 1655,172 1600,172"/>
+    <polygon class="deco" points="35,775 90,775 145,875 90,875"/>
+    <polygon class="deco" points="100,775 150,775 195,875 135,875"/>
+    <polygon class="deco" points="1565,778 1620,778 1560,875 1505,875"/>
+    <polygon class="deco" points="1635,778 1685,778 1625,875 1570,875"/>
+  </svg>
+  <div class="title">[ 제목을 짓기 귀찮아 버린;]</div>
+  <div class="bar"><div class="fill" id="fill"></div></div>
+  <div class="pct" id="pct">0%</div>
+  <div class="hint" id="hint">화면을 터치해서 시작하세요</div>
+</div>
+<div id="game">
+  <div id="help">W/A/S/D 이동 · 마우스 드래그 / 방향키 / Q·E 로 화면 회전 · Shift 달리기 · Space 점프 · 1번: 낚싯대</div>
+  <!-- 좌측 상단 소지금 / 물고기 및 판매 버튼 -->
+  <div id="shopHud">
+    <div class="hud-stats">
+      <span id="moneyText">💰 0원</span>
+      <span>|</span>
+      <span id="fishCountText">🐟 0마리</span>
+    </div>
+    <button id="sellBtn" type="button">💰 물고기 판매 (1원)</button>
+  </div>
+  <div id="pad"><button data-k="KeyW">W</button><button data-k="KeyA">A</button><button data-k="KeyS">S</button><button data-k="KeyD">D</button></div>
+  <!-- 하단 아이템 바 -->
+  <div id="hotbar">
+    <div class="slot" data-slot="1" title="낚싯대 (1)">
+      <span class="num">1</span>
+      <svg viewBox="0 0 40 40" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 32 C14 22, 22 14, 32 8" stroke="#c88a4b" stroke-width="3"/>
+        <circle cx="13" cy="27" r="2.6" fill="#9aa7b8" stroke="#465261" stroke-width="1"/>
+        <path d="M32 8 L32 23" stroke="#e6f7ff" stroke-width="1.3" stroke-dasharray="2 1.5"/>
+        <circle cx="32" cy="25" r="2.4" fill="#ff4d4d"/>
+      </svg>
+    </div>
+    <div class="slot" data-slot="2" id="slot2"><span class="num">2</span></div>
+    <div class="slot" data-slot="3"><span class="num">3</span></div>
+    <div class="slot" data-slot="4"><span class="num">4</span></div>
+    <div class="slot" data-slot="5" id="slot5" title="휘슬 (5)">
+      <span class="num">5</span>
+      <svg viewBox="0 0 40 40" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 14 L29 14 L29 21 L23 23 A8 8 0 1 1 12 14 Z" fill="#ffd43b" stroke="#8f6200" stroke-width="2"/>
+        <circle cx="15" cy="23" r="3.2" fill="#8f6200"/>
+        <path d="M22 14 L22 18" stroke="#8f6200" stroke-width="2"/>
+        <path d="M31 11 L35 9 M32 16 L36 16 M31 21 L35 23" stroke="#fff3bf" stroke-width="1.8"/>
+      </svg>
+    </div>
+  </div>
+  <!-- NPC 말걸기 및 대화창 -->
+  <button id="talkBtn" type="button">💬 말걸기</button>
+  <div id="npcDialog">
+    <div class="npc-name">붉은 안개의 해결사</div>
+    <div class="npc-text" id="npcText">"이봐, 1원만 주면 내가 아끼는 특별한 낚싯대를 넘겨주지. 어때?"</div>
+    <div class="npc-btns">
+      <button id="npcPayBtn" type="button">💰 1원 주기</button>
+      <button id="npcCloseBtn" type="button">닫기</button>
+    </div>
+  </div>
+  <!-- 상단 특별 획득 문구 -->
+  <div id="specialBanner">[미1미 큿리히;; 획드으윽!]</div>
+  <!-- 호수 앞 던지기 버튼 -->
+  <button id="fishBtn" type="button">🎣 던지기</button>
+  <!-- 낚시 미니게임 UI -->
+  <div id="fishGame">
+    <div class="fg-track-wrap" id="fgTrack">
+      <div class="fg-inner">
+        <div class="fg-white" id="fgWhite"><span>←</span><span>→</span></div>
+        <div class="fg-gray" id="fgGray"></div>
+      </div>
+      <div class="fg-slash" id="fgSlash"></div>
+    </div>
+    <div class="fg-prog-wrap"><div class="fg-prog-fill" id="fgProg"></div></div>
+    <div class="fg-tip">화면 꾹 누르기 / Space : 흰색 바 오른쪽 이동 · 떼기 : 왼쪽 이동</div>
+  </div>
+  <!-- 물고기 획득 알림 -->
+  <div id="catchToast"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  var fill = document.getElementById('fill'), pct = document.getElementById('pct'), hint = document.getElementById('hint'),
+      stage = document.getElementById('stage'), game = document.getElementById('game'),
+      help = document.getElementById('help'), pad = document.getElementById('pad');
+  var seed = 7;
+  function R() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+  function PX(z) { return 5 + 14 * Math.sin(z * 0.03); }
+  // 시작 지점(Z=-108) 바로 앞쪽에 넓고 아름다운 호수 배치
+  var LR = 24, LZ = -72, LX = PX(-108) + 6, LW = 2.2;
+  function LD(x, z) { return Math.hypot(x - LX, z - LZ); }
+  function sm(a, b, x) { x = Math.max(0, Math.min(1, (x - a) / (b - a))); return x * x * (3 - 2 * x); }
+  function H(x, z) {
+    var b = 4 + 2.2 * Math.sin(x * 0.045 + 1) * Math.cos(z * 0.035) + 1.4 * Math.sin(x * 0.09 + z * 0.07) + 0.7 * Math.sin(z * 0.11 + x * 0.05);
+    var d = LD(x, z); b += (3.2 - b) * sm(LR * 1.7, LR * 1.1, d); b -= 3.6 * sm(LR, LR * 0.5, d);
+    var s = Math.max(0, Math.min(1, (-48 - x) / 27));
+    return b - 16 * s * s * (3 - 2 * s);
+  }
+  var touch = 'ontouchstart' in window;
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  game.insertBefore(renderer.domElement, game.firstChild);
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0xbfe0ff, 90, 430);
+  var camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1500);
+  camera.rotation.order = 'YXZ';
+  scene.add(camera);
+  var D = new THREE.Object3D(), col = new THREE.Color(), C = [], clouds = null;
+
+  // 1인칭 낚싯대 모델 구성 (카메라에 부착)
+  var rodGroup = new THREE.Group();
+  var rodGrip = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.022, 0.026, 0.36, 10),
+    new THREE.MeshLambertMaterial({ color: 0x3b2414 })
+  );
+  rodGrip.position.y = 0.18;
+  var rodShaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.005, 0.018, 1.45, 10),
+    new THREE.MeshLambertMaterial({ color: 0xb87a3d })
+  );
+  rodShaft.position.y = 1.05;
+  var rodReel = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.035, 0.05, 12),
+    new THREE.MeshLambertMaterial({ color: 0x7c8794 })
+  );
+  rodReel.rotation.z = Math.PI / 2;
+  rodReel.position.set(0.03, 0.34, -0.02);
+  var linePts = [
+    new THREE.Vector3(0, 1.75, 0),
+    new THREE.Vector3(0, 1.35, -0.18),
+    new THREE.Vector3(0, 0.95, -0.32)
+  ];
+  var lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+  var rodLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xeaf6ff }));
+  var bobber = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 10), new THREE.MeshLambertMaterial({ color: 0xff4747 }));
+  bobber.position.set(0, 0.93, -0.33);
+  rodGroup.add(rodGrip, rodShaft, rodReel, rodLine, bobber);
+  rodGroup.position.set(0.36, -0.52, -0.45);
+  rodGroup.rotation.set(-0.55, 0.18, 0.12);
+  rodGroup.visible = false;
+  camera.add(rodGroup);
+
+  // 2번 슬롯 특수 낚싯대(미미크리 대검 형태) 모델 구성
+  var mimicryGroup = new THREE.Group();
+  var mHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.028, 0.34, 10), new THREE.MeshLambertMaterial({ color: 0x1a1a1e }));
+  mHandle.position.y = 0.17;
+  var mBlade = new THREE.Mesh(new THREE.ConeGeometry(0.11, 1.55, 5), new THREE.MeshLambertMaterial({ color: 0x8f1622 }));
+  mBlade.scale.set(0.35, 1, 1.25);
+  mBlade.position.set(0, 1.08, 0);
+  var mEdge = new THREE.Mesh(new THREE.BoxGeometry(0.015, 1.48, 0.045), new THREE.MeshLambertMaterial({ color: 0x5c6670 }));
+  mEdge.position.set(0, 1.06, -0.095);
+  mEdge.rotation.x = 0.055;
+  var mEye1 = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 10), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  mEye1.scale.set(0.45, 1.4, 0.85);
+  mEye1.position.set(-0.028, 0.68, 0.01);
+  var mPupil1 = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), new THREE.MeshBasicMaterial({ color: 0x247bff }));
+  mPupil1.position.set(-0.044, 0.68, 0.01);
+  var mEye2 = new THREE.Mesh(new THREE.SphereGeometry(0.032, 10, 10), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  mEye2.scale.set(0.45, 1.35, 0.8);
+  mEye2.position.set(-0.022, 1.15, -0.01);
+  var mPupil2 = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), new THREE.MeshBasicMaterial({ color: 0x247bff }));
+  mPupil2.position.set(-0.034, 1.15, -0.01);
+  var mSpike1 = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.14, 5), new THREE.MeshLambertMaterial({ color: 0x9e958e }));
+  mSpike1.rotation.x = Math.PI * 0.45;
+  mSpike1.position.set(0, 0.62, 0.12);
+  var mSpike2 = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.12, 5), new THREE.MeshLambertMaterial({ color: 0x9e958e }));
+  mSpike2.rotation.x = Math.PI * 0.45;
+  mSpike2.position.set(0, 0.85, 0.10);
+  mimicryGroup.add(mHandle, mBlade, mEdge, mEye1, mPupil1, mEye2, mPupil2, mSpike1, mSpike2);
+  mimicryGroup.position.set(0.38, -0.52, -0.45);
+  mimicryGroup.rotation.set(-0.55, 0.18, 0.12);
+  mimicryGroup.visible = false;
+  camera.add(mimicryGroup);
+
+  // 시작 지점 바로 옆에 배치할 첫 번째 사진 스타일의 NPC 생성
+  var npcPos = { x: PX(-108) - 2.6, z: -105.5 };
+  var npcGroup = new THREE.Group();
+  var npcY = H(npcPos.x, npcPos.z);
+  npcGroup.position.set(npcPos.x, npcY, npcPos.z);
+  npcGroup.rotation.y = Math.PI * 0.82;
+  // 다리(어두운 바지)
+  var legMat = new THREE.MeshLambertMaterial({ color: 0x261a1c });
+  var legL = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.88, 10), legMat);
+  legL.position.set(-0.14, 0.44, 0);
+  var legR = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.88, 10), legMat);
+  legR.position.set(0.14, 0.44, 0);
+  // 상체(적갈색 롱코트 + 흰색 라인 트리밍)
+  var coatMat = new THREE.MeshLambertMaterial({ color: 0x4a2026 });
+  var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.25, 0.72, 12), coatMat);
+  torso.scale.set(1.15, 1, 0.72);
+  torso.position.set(0, 1.22, 0);
+  var coatHem = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.31, 0.34, 12), coatMat);
+  coatHem.scale.set(1.15, 1, 0.75);
+  coatHem.position.set(0, 0.76, 0);
+  // 검은 리본 타이 & 붉은 보석 브로치
+  var tie = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.28, 6), new THREE.MeshLambertMaterial({ color: 0x161214 }));
+  tie.position.set(0, 1.41, 0.16);
+  var brooch = new THREE.Mesh(new THREE.SphereGeometry(0.038, 10, 10), new THREE.MeshBasicMaterial({ color: 0xe62e3d }));
+  brooch.position.set(0, 1.48, 0.175);
+  // 양팔
+  var armL = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.62, 10), coatMat);
+  armL.position.set(-0.31, 1.24, 0.04);
+  armL.rotation.set(-0.2, 0, 0.28);
+  var armR = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.62, 10), coatMat);
+  armR.position.set(0.28, 1.24, 0.02);
+  armR.rotation.set(0, 0, -0.14);
+  // 얼굴
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 14), new THREE.MeshLambertMaterial({ color: 0xe8cbb6 }));
+  head.scale.set(0.92, 1.05, 0.92);
+  head.position.set(0, 1.78, 0);
+  // 붉은 포니테일 장발
+  var hairMat = new THREE.MeshLambertMaterial({ color: 0x8f2428 });
+  var hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.235, 14, 14), hairMat);
+  hairTop.position.set(0, 1.83, -0.03);
+  var ponyTail = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.25, 10), hairMat);
+  ponyTail.position.set(0, 1.38, -0.26);
+  ponyTail.rotation.x = 0.24;
+  var sideHairL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.56, 0.12), hairMat);
+  sideHairL.position.set(-0.19, 1.62, 0.08);
+  var sideHairR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.56, 0.12), hairMat);
+  sideHairR.position.set(0.19, 1.62, 0.08);
+  npcGroup.add(legL, legR, torso, coatHem, tie, brooch, armL, armR, head, hairTop, ponyTail, sideHairL, sideHairR);
+  scene.add(npcGroup);
+  C.push({ x: npcPos.x, z: npcPos.z, r: 0.9 });
+
+  // 물 위에 던져질 3D 찌와 낚싯줄(월드 좌표용)
+  var worldBobber = new THREE.Group();
+  var wbTop = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 12), new THREE.MeshLambertMaterial({ color: 0xff3b3b }));
+  wbTop.position.y = 0.04;
+  var wbBot = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 12), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+  wbBot.position.y = -0.03;
+  worldBobber.add(wbTop, wbBot);
+  worldBobber.visible = false;
+  scene.add(worldBobber);
+
+  var castLineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]);
+  var castLine = new THREE.Line(castLineGeo, new THREE.LineBasicMaterial({ color: 0xeaf6ff }));
+  castLine.frustumCulled = false;
+  castLine.visible = false;
+  scene.add(castLine);
+
+  // 호수 중앙에 소환되는 보스 캐릭터 (첨부 이미지 그대로 표현한 캔버스 텍스처 스프라이트)
+  var bossGroup = new THREE.Group();
+  var bossInner = new THREE.Group();
+  var bCanvas = document.createElement('canvas');
+  bCanvas.width = 512; bCanvas.height = 512;
+  var bx = bCanvas.getContext('2d');
+  // 1) 배경 (어두운 코트 깃 & 상단 파란 하늘/흰 칼라 디테일)
+  bx.fillStyle = '#333438';
+  bx.fillRect(0, 0, 512, 512);
+  bx.fillStyle = '#4a85d4';
+  bx.beginPath(); bx.moveTo(0, 0); bx.lineTo(75, 0); bx.lineTo(35, 130); bx.lineTo(0, 130); bx.closePath(); bx.fill();
+  bx.fillStyle = '#f2f3f5';
+  bx.beginPath(); bx.moveTo(205, 0); bx.lineTo(307, 0); bx.lineTo(285, 42); bx.lineTo(227, 42); bx.closePath(); bx.fill();
+  bx.strokeStyle = '#0e0e10'; bx.lineWidth = 7;
+  bx.beginPath(); bx.moveTo(75, 0); bx.lineTo(15, 210); bx.lineTo(0, 390); bx.stroke();
+  bx.beginPath(); bx.moveTo(415, 0); bx.lineTo(445, 195); bx.lineTo(512, 235); bx.stroke();
+  // 2) 검은 단발 뒷머리 실루엣
+  bx.fillStyle = '#151518';
+  bx.beginPath();
+  bx.moveTo(95, 250);
+  bx.bezierCurveTo(60, 140, 125, 22, 256, 22);
+  bx.bezierCurveTo(387, 22, 452, 140, 417, 250);
+  bx.bezierCurveTo(405, 295, 355, 315, 330, 290);
+  bx.lineTo(182, 290);
+  bx.bezierCurveTo(157, 315, 107, 295, 95, 250);
+  bx.fill(); bx.stroke();
+  // 3) 목 금테 & 깃털 칼라
+  bx.fillStyle = '#e3cc78';
+  bx.beginPath(); bx.ellipse(256, 295, 76, 26, 0, 0, Math.PI * 2); bx.fill(); bx.stroke();
+  bx.fillStyle = '#18171a';
+  bx.beginPath();
+  bx.moveTo(130, 315); bx.lineTo(155, 345); bx.lineTo(175, 332); bx.lineTo(198, 360);
+  bx.lineTo(225, 340); bx.lineTo(256, 365); bx.lineTo(287, 340); bx.lineTo(314, 360);
+  bx.lineTo(337, 332); bx.lineTo(357, 345); bx.lineTo(382, 315);
+  bx.lineTo(350, 295); bx.lineTo(162, 295); bx.closePath();
+  bx.fill(); bx.stroke();
+  // 4) 몸통 코트 & 금빛 트리밍 + 발자국 문양
+  bx.fillStyle = '#222124';
+  bx.beginPath();
+  bx.moveTo(145, 335); bx.lineTo(367, 335); bx.lineTo(395, 512); bx.lineTo(117, 512); bx.closePath();
+  bx.fill(); bx.stroke();
+  bx.fillStyle = '#e3cc78';
+  bx.fillRect(212, 345, 14, 167); bx.strokeRect(212, 345, 14, 167);
+  bx.fillRect(286, 345, 14, 167); bx.strokeRect(286, 345, 14, 167);
+  bx.fillRect(212, 488, 88, 14); bx.strokeRect(212, 488, 88, 14);
+  // 양팔 소매 & 금색 띠
+  bx.fillStyle = '#222124';
+  bx.beginPath(); bx.moveTo(148, 335); bx.lineTo(96, 445); bx.lineTo(172, 462); bx.lineTo(196, 365); bx.closePath(); bx.fill(); bx.stroke();
+  bx.beginPath(); bx.moveTo(364, 335); bx.lineTo(416, 445); bx.lineTo(340, 462); bx.lineTo(316, 365); bx.closePath(); bx.fill(); bx.stroke();
+  bx.fillStyle = '#e3cc78';
+  bx.beginPath(); bx.moveTo(104, 426); bx.lineTo(176, 442); bx.lineTo(171, 458); bx.lineTo(99, 442); bx.closePath(); bx.fill(); bx.stroke();
+  bx.beginPath(); bx.moveTo(408, 426); bx.lineTo(336, 442); bx.lineTo(341, 458); bx.lineTo(413, 442); bx.closePath(); bx.fill(); bx.stroke();
+  // 하얀 손
+  bx.fillStyle = '#f8f7f2';
+  bx.beginPath(); bx.ellipse(132, 476, 32, 26, -0.2, 0, Math.PI * 2); bx.fill(); bx.stroke();
+  bx.beginPath(); bx.ellipse(380, 476, 32, 26, 0.2, 0, Math.PI * 2); bx.fill(); bx.stroke();
+  // 5) 동그란 얼굴 & 홍조
+  bx.fillStyle = '#fbf9f2';
+  bx.beginPath();
+  bx.moveTo(132, 168);
+  bx.bezierCurveTo(118, 255, 185, 292, 256, 292);
+  bx.bezierCurveTo(327, 292, 394, 255, 380, 168);
+  bx.bezierCurveTo(365, 92, 147, 92, 132, 168);
+  bx.fill(); bx.stroke();
+  var blL = bx.createRadialGradient(162, 224, 2, 162, 224, 26);
+  blL.addColorStop(0, 'rgba(245, 185, 150, 0.55)'); blL.addColorStop(1, 'rgba(245, 185, 150, 0)');
+  bx.fillStyle = blL; bx.beginPath(); bx.arc(162, 224, 26, 0, Math.PI * 2); bx.fill();
+  var blR = bx.createRadialGradient(350, 224, 2, 350, 224, 26);
+  blR.addColorStop(0, 'rgba(245, 185, 150, 0.55)'); blR.addColorStop(1, 'rgba(245, 185, 150, 0)');
+  bx.fillStyle = blR; bx.beginPath(); bx.arc(350, 224, 26, 0, Math.PI * 2); bx.fill();
+  // 6) 앞머리 & 옆머리
+  bx.fillStyle = '#151518';
+  bx.beginPath();
+  bx.moveTo(112, 225);
+  bx.bezierCurveTo(85, 130, 145, 34, 256, 34);
+  bx.bezierCurveTo(367, 34, 427, 130, 400, 225);
+  bx.bezierCurveTo(382, 185, 365, 150, 348, 128);
+  bx.lineTo(315, 148); bx.lineTo(294, 114); bx.lineTo(264, 144);
+  bx.lineTo(238, 108); bx.lineTo(205, 146); bx.lineTo(175, 124);
+  bx.bezierCurveTo(152, 150, 132, 185, 112, 225);
+  bx.fill(); bx.stroke();
+  // 7) 눈썹, 회색 큰 눈, 하이라이트, 벌린 입
+  bx.beginPath(); bx.moveTo(155, 154); bx.quadraticCurveTo(188, 138, 220, 154); bx.stroke();
+  bx.beginPath(); bx.moveTo(292, 154); bx.quadraticCurveTo(324, 138, 357, 154); bx.stroke();
+  bx.fillStyle = '#68676c';
+  bx.beginPath(); bx.ellipse(190, 188, 34, 25, -0.06, 0, Math.PI * 2); bx.fill(); bx.stroke();
+  bx.beginPath(); bx.ellipse(322, 188, 34, 25, 0.06, 0, Math.PI * 2); bx.fill(); bx.stroke();
+  bx.fillStyle = '#ffffff';
+  bx.beginPath(); bx.arc(178, 180, 7, 0, Math.PI * 2); bx.fill();
+  bx.beginPath(); bx.arc(310, 180, 7, 0, Math.PI * 2); bx.fill();
+  bx.fillStyle = '#9c4b52';
+  bx.beginPath();
+  bx.moveTo(256, 212);
+  bx.lineTo(286, 232);
+  bx.bezierCurveTo(292, 265, 274, 282, 256, 282);
+  bx.bezierCurveTo(238, 282, 220, 265, 226, 232);
+  bx.closePath();
+  bx.fill(); bx.stroke();
+
+  var bossTex = new THREE.CanvasTexture(bCanvas);
+  var bossPanel = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.6, 5.6),
+    new THREE.MeshBasicMaterial({ map: bossTex, side: THREE.DoubleSide })
+  );
+  bossPanel.position.y = 2.85;
+  var bossFrame = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.85, 5.85),
+    new THREE.MeshBasicMaterial({ color: 0x111114, side: THREE.DoubleSide })
+  );
+  bossFrame.position.set(0, 2.85, -0.02);
+  bossInner.add(bossFrame, bossPanel);
+  bossGroup.add(bossInner);
+  bossGroup.position.set(LX, LW + 0.05, LZ);
+  bossGroup.visible = false;
+  scene.add(bossGroup);
+
+  function inst(geo, mat, n) { var m = new THREE.InstancedMesh(geo, mat, n); m.frustumCulled = false; scene.add(m); return m; }
+  function put(m, i, x, y, z, sx, sy, sz, ry, c) {
+    D.position.set(x, y, z); D.scale.set(sx, sy, sz); D.rotation.set(0, ry || 0, 0); D.updateMatrix();
+    m.setMatrixAt(i, D.matrix); if (c !== undefined) m.setColorAt(i, col.set(c));
+  }
+  var L = function (c, o) { o = o || {}; o.color = c; return new THREE.MeshLambertMaterial(o); };
+
+  var T = [];
+  T.push(function () { // 하늘, 빛, 태양, 바다
+    var g = new THREE.SphereGeometry(900, 24, 16), p = g.attributes.position, cs = [], top = new THREE.Color(0x1f6fe0), hor = new THREE.Color(0xbfe0ff);
+    for (var i = 0; i < p.count; i++) { var t = Math.pow(Math.max(0, p.getY(i) / 900), 0.6); var c = hor.clone().lerp(top, t); cs.push(c.r, c.g, c.b); }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(cs, 3));
+    scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false })));
+    scene.add(new THREE.HemisphereLight(0xaad4ff, 0x5a8a3a, 0.95));
+    var sd = new THREE.Vector3(-0.45, 0.6, -0.65).normalize(), dl = new THREE.DirectionalLight(0xfff2d8, 1.0);
+    dl.position.copy(sd); scene.add(dl);
+    var cv = document.createElement('canvas'); cv.width = cv.height = 128; var cx = cv.getContext('2d'), gr = cx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, '#fff'); gr.addColorStop(0.25, '#fff'); gr.addColorStop(0.3, 'rgba(255,255,255,.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    cx.fillStyle = gr; cx.fillRect(0, 0, 128, 128);
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), fog: false, depthWrite: false }));
+    sp.position.copy(sd.multiplyScalar(800)); sp.scale.set(260, 260, 1); scene.add(sp);
+    var w = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400).rotateX(-Math.PI / 2), L(0x1f82e8, { emissive: 0x0a3f8a }));
+    w.position.y = -3; scene.add(w);
+    var lk = new THREE.Mesh(new THREE.CircleGeometry(LR * 0.95, 48).rotateX(-Math.PI / 2), L(0x2a9be8, { emissive: 0x0b4a90, transparent: true, opacity: 0.88 }));
+    lk.position.set(LX, LW, LZ); scene.add(lk);
+  });
+  T.push(function () { // 지형
+    var g = new THREE.PlaneGeometry(340, 520, 170, 260).rotateX(-Math.PI / 2).translate(90, 0, 0), p = g.attributes.position;
+    for (var i = 0; i < p.count; i++) p.setY(i, H(p.getX(i), p.getZ(i)));
+    g = g.toNonIndexed(); g.computeVertexNormals(); p = g.attributes.position;
+    var cs = new Float32Array(p.count * 3), gc = [0x6ec23a, 0x7bd145, 0x66b83a, 0x74c840];
+    for (var f = 0; f < p.count; f += 3) {
+      var x = (p.getX(f) + p.getX(f + 1) + p.getX(f + 2)) / 3, z = (p.getZ(f) + p.getZ(f + 1) + p.getZ(f + 2)) / 3, y = (p.getY(f) + p.getY(f + 1) + p.getY(f + 2)) / 3, c;
+      var ld = LD(x, z);
+      if (ld < LR * 1.25 && y < LW + 0.1) c = col.set(0x3f87a8); else if (ld < LR * 1.25 && y < LW + 0.6) c = col.set(0xe0d198); else if (y < -2.2) c = col.set(0x4a7090); else if (x < -46) c = col.set(R() < 0.5 ? 0x8a6644 : 0x70512f);
+      else if (Math.abs(x - PX(z)) < 1.8 && x > -40) c = col.set(R() < 0.5 ? 0xcfa970 : 0xc09a62);
+      else c = col.set(gc[(R() * 4) | 0]);
+      for (var k = 0; k < 3; k++) { cs[(f + k) * 3] = c.r; cs[(f + k) * 3 + 1] = c.g; cs[(f + k) * 3 + 2] = c.b; }
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(cs, 3));
+    scene.add(new THREE.Mesh(g, L(0xffffff, { vertexColors: true })));
+  });
+  var GN = touch ? 30000 : 70000, GCH = 7, grass;
+  T.push(function () { grass = inst(new THREE.ConeGeometry(0.14, 0.9, 4).translate(0, 0.45, 0), L(0xffffff, { emissive: 0x1a3a10 }), GN); });
+  for (var gi = 0; gi < GCH; gi++) (function (k) {
+    T.push(function () {
+      var a = Math.floor(GN * k / GCH), b = Math.floor(GN * (k + 1) / GCH);
+      for (var i = a; i < b; i++) {
+        var x, z; do { x = -38 + R() * 178; z = -150 + R() * 285; } while (Math.abs(x - PX(z)) < 1.8 || LD(x, z) < LR * 1.05);
+        put(grass, i, x, H(x, z), z, 0.7 + R() * 0.8, 0.5 + R() * 1.3, 0.7 + R() * 0.8, R() * 6.28);
+        grass.setColorAt(i, col.setHSL(0.25 + R() * 0.05, 0.65, 0.38 + R() * 0.14));
+      }
+      grass.instanceMatrix.needsUpdate = true; grass.instanceColor.needsUpdate = true;
+    });
+  })(gi);
+  T.push(function () { // 나무
+    var N = 70, tr = inst(new THREE.BoxGeometry(1.2, 5, 1.2), L(0x6b4423), N), lf = inst(new THREE.BoxGeometry(1, 1, 1), L(0xffffff), N * 3), n = 0;
+    for (var i = 0; i < N; i++) {
+      var z, x; do { z = -125 + R() * 150; x = i < 6 ? -30 + R() * 10 : PX(z) + 20 + R() * 90; } while (LD(x, z) < LR * 1.3);
+      var y = H(x, z), c = [0x3f9e3a, 0x4aa840, 0x378f35][(R() * 3) | 0];
+      put(tr, i, x, y + 2.5, z, 1, 1, 1, 0, 0x6b4423);
+      put(lf, n++, x, y + 5.5, z, 4.8, 3.6, 4.8, 0, c); put(lf, n++, x + 0.4, y + 8, z - 0.3, 3.2, 3.2, 3.2, 0, c); put(lf, n++, x - 1.2, y + 7, z + 1, 2.6, 2.6, 2.6, 0, c);
+      C.push({ x: x, z: z, r: 1 });
+    }
+  });
+  T.push(function () { // 집 (호수와 겹치지 않도록 배치)
+    var wm = L(0xf3e7d3), rm = L(0xb5654a), dm = L(0x4a3426), rg = new THREE.ConeGeometry(6, 3.2, 4).rotateY(Math.PI / 4);
+    for (var i = 0; i < 6; i++) {
+      var z = -32 - i * 16 - R() * 6, s = i % 2 ? 1 : -1, x = PX(z) + s * (12 + R() * 5);
+      if (LD(x, z) < LR + 9) x = PX(z) - (13 + R() * 4);
+      var y = H(x, z) - 0.3, ry = x > PX(z) ? Math.PI / 2 : -Math.PI / 2;
+      var h = new THREE.Group(); h.position.set(x, y, z); h.rotation.y = ry;
+      var b = new THREE.Mesh(new THREE.BoxGeometry(7, 4, 6), wm); b.position.y = 2; h.add(b);
+      var r = new THREE.Mesh(rg, rm); r.scale.set(1.3, 1, 1.15); r.position.y = 5.6; h.add(r);
+      var d = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.2), dm); d.position.set(0, 1.1, 3.05); h.add(d);
+      scene.add(h); C.push({ x: x, z: z, r: 5 });
+    }
+  });
+  T.push(function () { // 울타리와 바위
+    var n = 42, po = inst(new THREE.BoxGeometry(0.5, 1.7, 0.5), L(0x6b4a30), n + 1), ra = inst(new THREE.BoxGeometry(0.25, 0.3, 3.05), L(0x7a5538), n * 2);
+    for (var i = 0; i <= n; i++) {
+      var z = 120 - i * 3, y = H(-40, z); put(po, i, -40, y + 0.8, z, 1, 1, 1, 0, 0x6b4a30);
+      if (i < n) {
+        var y2 = H(-40, z - 3);
+        for (var j = 0; j < 2; j++) {
+          D.position.set(-40, (y + y2) / 2 + 0.6 + j * 0.55, z - 1.5); D.scale.set(1, 1, 1); D.rotation.set(Math.atan((y2 - y) / 3), 0, 0); D.updateMatrix();
+          ra.setMatrixAt(i * 2 + j, D.matrix); ra.setColorAt(i * 2 + j, col.set(0x7a5538));
+        }
+      }
+    }
+    var rk = inst(new THREE.DodecahedronGeometry(1, 0), L(0x8a8f96), 10);
+    for (var k = 0; k < 10; k++) {
+      var rz, rx;
+      do { rz = -120 + R() * 220; rx = PX(rz) + (R() - 0.5) * 30; } while (LD(rx, rz) < LR * 1.15);
+      put(rk, k, rx, H(rx, rz) + 0.3, rz, 1.5 + R(), 0.9, 1.2 + R(), R() * 6, 0x8a8f96);
+    }
+  });
+  T.push(function () { // 구름과 먼 산
+    clouds = inst(new THREE.BoxGeometry(1, 1, 1), L(0xffffff, { emissive: 0x7f8fb0, fog: false }), 400); var n = 0;
+    for (var c = 0; c < 36; c++) {
+      var cx = (R() - 0.5) * 900, cy = 70 + R() * 55, cz = -380 + R() * 650, k = 4 + (R() * 5 | 0);
+      for (var j = 0; j < k && n < 400; j++) put(clouds, n++, cx + (j - k / 2) * 10, cy + (R() - 0.5) * 6, cz + (R() - 0.5) * 14, 14 + R() * 22, 6 + R() * 7, 10 + R() * 14, 0, 0xffffff);
+    }
+    var mm = L(0x4c9a62);
+    [[-200, -380, 110, 70], [-60, -400, 130, 85], [120, -380, 100, 60], [260, -330, 120, 70], [-330, -250, 90, 50], [-400, -80, 80, 40]].forEach(function (m) {
+      var mt = new THREE.Mesh(new THREE.ConeGeometry(m[2], m[3], 7), mm); mt.position.set(m[0], m[3] / 2 - 6, m[1]); scene.add(mt);
+    });
+  });
+
+  // ---- 로딩: 실제로 맵을 만드는 진행률 ----
+  var target = 0, shown = 0, ready = false;
+  function run(i) { if (i >= T.length) { target = 1; return; } T[i](); target = (i + 1) / T.length; setTimeout(function () { run(i + 1); }, 40); }
+  var lt = performance.now();
+  (function tick(t) {
+    var dt = Math.min(0.1, (t - lt) / 1000); lt = t;
+    var goal = target * 100; if (shown < goal) shown = Math.min(goal, shown + dt * (16 + Math.random() * 14));
+    fill.style.width = shown + '%'; pct.textContent = Math.floor(shown) + '%';
+    if (shown >= 100) { ready = true; hint.classList.add('show'); } else requestAnimationFrame(tick);
+  })(lt);
+  setTimeout(function () { run(0); }, 500);
+
+  // ---- 게임 ----
+  // 시작 시 플레이어가 바로 앞 호수를 바라보도록 시야각(yaw) 조정
+  var K = {}, yaw = Math.PI - 0.16, pitch = -0.08, X = PX(-108), Z = -108, Y = H(X, Z) + 1.7, vy = 0, ground = true, bob = 0, running = false, last = 0;
+  var activeSlot = 0, equipAnim = 0;
+  var isCasting = false, castTime = 0, castTarget = new THREE.Vector3(), castStart = new THREE.Vector3(), tipPos = new THREE.Vector3();
+  var slots = document.querySelectorAll('#hotbar .slot');
+  var fishBtn = document.getElementById('fishBtn');
+  var fishGame = document.getElementById('fishGame'), fgWhite = document.getElementById('fgWhite'),
+      fgGray = document.getElementById('fgGray'), fgProg = document.getElementById('fgProg'),
+      fgSlash = document.getElementById('fgSlash'), fgTrack = document.getElementById('fgTrack'),
+      catchToast = document.getElementById('catchToast');
+  var biteTimer = null, slashTimer = null, miniActive = false, holdReel = false;
+  var whitePos = 36, whiteVel = 0, whiteWidth = 28;
+  var grayPos = 50, grayTarget = 50, grayTimer = 0, catchProgress = 25;
+  var bossSummoned = false, isBossFight = false, pillarTimer = 0;
+  var FISH_LIST = ['붕어', '잉어', '무지개송어', '황금잉어', '배스', '연어', '민물장어'];
+  var toastTimer = null, bannerTimer = null;
+  var fishCount = 0, money = 0, hasMimicryRod = false, dialogOpen = false;
+  var shopHud = document.getElementById('shopHud'), moneyText = document.getElementById('moneyText'),
+      fishCountText = document.getElementById('fishCountText'), sellBtn = document.getElementById('sellBtn');
+  var talkBtn = document.getElementById('talkBtn'), npcDialog = document.getElementById('npcDialog'),
+      npcText = document.getElementById('npcText'), npcPayBtn = document.getElementById('npcPayBtn'),
+      npcCloseBtn = document.getElementById('npcCloseBtn'), specialBanner = document.getElementById('specialBanner'),
+      slot2 = document.getElementById('slot2');
+
+  function showSpecialBanner() {
+    specialBanner.classList.add('show');
+    if (bannerTimer) clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(function () { specialBanner.classList.remove('show'); }, 3000);
+  }
+
+  function grantMimicryRod() {
+    hasMimicryRod = true;
+    slot2.setAttribute('title', '미1미 큿리히;; 낚싯대 (2)');
+    slot2.innerHTML = '<span class="num">2</span>' +
+      '<svg viewBox="0 0 40 40" fill="none" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M8 33 L13 28" stroke="#1e1e24" stroke-width="4.5"/>' +
+      '<path d="M12 29 L33 7 L26 20 L15 29 Z" fill="#9e1927" stroke="#5e6873" stroke-width="1.3"/>' +
+      '<ellipse cx="21" cy="21" rx="2.4" ry="1.4" transform="rotate(-45 21 21)" fill="#fff"/>' +
+      '<circle cx="21" cy="21" r="0.8" fill="#247bff"/>' +
+      '<ellipse cx="26.5" cy="14.5" rx="1.7" ry="1" transform="rotate(-45 26.5 14.5)" fill="#fff"/>' +
+      '<circle cx="26.5" cy="14.5" r="0.6" fill="#247bff"/>' +
+      '</svg>';
+  }
+
+  talkBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dialogOpen = true;
+    talkBtn.style.display = 'none';
+    if (hasMimicryRod) {
+      npcText.textContent = '"이미 내 낚싯대를 가져갔잖아. 그걸로 호수를 베어버리라고."';
+      npcPayBtn.style.display = 'none';
+    } else {
+      npcText.textContent = '"이봐, 1원만 주면 내가 아끼는 특별한 낚싯대를 넘겨주지. 어때?"';
+      npcPayBtn.style.display = 'inline-block';
+    }
+    npcDialog.style.display = 'flex';
+  });
+
+  npcPayBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (hasMimicryRod) return;
+    if (money < 1) {
+      showToast('💸 돈이 부족합니다! 물고기를 잡아 판매해 1원을 모으세요.');
+      return;
+    }
+    money -= 1;
+    updateShopUI();
+    grantMimicryRod();
+    npcDialog.style.display = 'none';
+    dialogOpen = false;
+    showSpecialBanner();
+  });
+
+  npcCloseBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    npcDialog.style.display = 'none';
+    dialogOpen = false;
+  });
+
+  function updateShopUI() {
+    moneyText.textContent = '💰 ' + money + '원';
+    fishCountText.textContent = '🐟 ' + fishCount + '마리';
+    if (fishCount > 0 && !miniActive) {
+      sellBtn.style.display = 'block';
+      sellBtn.textContent = '💰 물고기 판매 (+' + fishCount + '원)';
+    } else {
+      sellBtn.style.display = 'none';
+    }
+  }
+
+  sellBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (fishCount <= 0) return;
+    var earned = fishCount * 1;
+    money += earned;
+    fishCount = 0;
+    updateShopUI();
+    showToast('💰 물고기를 모두 판매해 ' + earned + '원을 얻었습니다!');
+  });
+
+  function showToast(msg) {
+    catchToast.textContent = msg;
+    catchToast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { catchToast.classList.remove('show'); }, 2600);
+  }
+
+  function setUIHiddenForMinigame(hide) {
+    hotbar.style.display = hide ? 'none' : 'flex';
+    var hasRod = (activeSlot === 1 || (activeSlot === 2 && hasMimicryRod));
+    fishBtn.style.display = hide ? 'none' : ((hasRod && LD(X, Z) <= LR + 8.5) ? 'block' : 'none');
+    help.style.display = hide ? 'none' : 'block';
+    shopHud.style.display = hide ? 'none' : 'flex';
+    if (hide) {
+      talkBtn.style.display = 'none';
+      npcDialog.style.display = 'none';
+      dialogOpen = false;
+    }
+    if (!hide) updateShopUI();
+    if (touch) pad.style.display = hide ? 'none' : 'grid';
+    fishGame.style.display = hide ? 'flex' : 'none';
+  }
+
+  function startMinigame() {
+    miniActive = true;
+    holdReel = false;
+    isBossFight = bossSummoned;
+    pillarTimer = 3.2;
+    whitePos = 36;
+    whiteVel = 0;
+    grayPos = 50;
+    grayTarget = 20 + Math.random() * 60;
+    grayTimer = 0.7;
+    catchProgress = 25;
+    fgWhite.style.left = whitePos + '%';
+    fgGray.style.left = grayPos + '%';
+    fgProg.style.width = catchProgress + '%';
+    fgSlash.classList.remove('active');
+    setUIHiddenForMinigame(true);
+
+    // 2번 특수 낚싯대 사용 시 물고기가 낚인 지 2초 뒤에 붉은 참격으로 바를 베며 게이지 충전 (보스 물고기는 50% 약화되어 45% 충전)
+    if (slashTimer) clearTimeout(slashTimer);
+    if (activeSlot === 2 && hasMimicryRod) {
+      slashTimer = setTimeout(function () {
+        slashTimer = null;
+        if (!miniActive) return;
+        fgSlash.classList.remove('active');
+        void fgSlash.offsetWidth;
+        fgSlash.classList.add('active');
+        fgTrack.style.boxShadow = '0 0 28px rgba(255, 25, 60, 0.95)';
+        setTimeout(function () {
+          fgTrack.style.boxShadow = '0 8px 26px rgba(0,0,0,.75)';
+        }, 450);
+        if (isBossFight) {
+          catchProgress = Math.min(100, catchProgress + 45);
+          showToast('⚔️ 보스의 저항으로 붉은 베기 위력이 50% 약화되었습니다! (+45%)');
+        } else {
+          catchProgress = Math.max(catchProgress, 90);
+        }
+        fgProg.style.width = catchProgress + '%';
+      }, 2000);
+    }
+  }
+
+  function spawnYellowPillarAttack() {
+    if (!miniActive || !isBossFight) return;
+    var inner = fgTrack.querySelector('.fg-inner');
+    var targetPct = 8 + Math.random() * 84;
+    var warnEl = document.createElement('div');
+    warnEl.className = 'fg-pillar-warn';
+    warnEl.style.left = targetPct + '%';
+    inner.appendChild(warnEl);
+
+    setTimeout(function () {
+      if (warnEl.parentNode) warnEl.parentNode.removeChild(warnEl);
+      if (!miniActive || !isBossFight) return;
+      var pillarEl = document.createElement('div');
+      pillarEl.className = 'fg-pillar';
+      pillarEl.style.left = targetPct + '%';
+      inner.appendChild(pillarEl);
+
+      // 흰색 바가 노란색 기둥에 닿았는지 판정
+      var hitHalfWidth = 3.2;
+      if (targetPct + hitHalfWidth >= whitePos && targetPct - hitHalfWidth <= whitePos + whiteWidth) {
+        catchProgress = Math.max(0, catchProgress - 18);
+        fgProg.style.width = catchProgress + '%';
+        fgTrack.style.boxShadow = '0 0 26px rgba(255, 215, 0, 0.95)';
+        setTimeout(function () {
+          fgTrack.style.boxShadow = '0 8px 26px rgba(0,0,0,.75)';
+        }, 350);
+      }
+      setTimeout(function () {
+        if (pillarEl.parentNode) pillarEl.parentNode.removeChild(pillarEl);
+      }, 480);
+    }, 1300);
+  }
+
+  function endMinigame(success) {
+    var wasBoss = isBossFight;
+    miniActive = false;
+    holdReel = false;
+    isBossFight = false;
+    // 남아있는 기둥 이펙트 정리
+    var oldPillars = fgTrack.querySelectorAll('.fg-pillar, .fg-pillar-warn');
+    for (var p = 0; p < oldPillars.length; p++) oldPillars[p].remove();
+    setUIHiddenForMinigame(false);
+    stopFishing();
+    if (success) {
+      if (wasBoss) {
+        bossSummoned = false;
+        bossGroup.visible = false;
+        fishCount += 5;
+        updateShopUI();
+        showToast('👑 [노래 한곡 뽑겠단다] 보스 물고기를 낚았습니다! (+5마리)');
+      } else {
+        var caught = FISH_LIST[(Math.random() * FISH_LIST.length) | 0];
+        fishCount += 1;
+        updateShopUI();
+        showToast('🐟 ' + caught + '을(를) 낚았습니다!');
+      }
+    } else {
+      showToast('💨 아쉽게도 물고기가 도망쳤습니다...');
+    }
+  }
+
+  function stopFishing() {
+    if (biteTimer) { clearTimeout(biteTimer); biteTimer = null; }
+    if (slashTimer) { clearTimeout(slashTimer); slashTimer = null; }
+    if (miniActive) {
+      miniActive = false;
+      holdReel = false;
+      setUIHiddenForMinigame(false);
+    }
+    isCasting = false;
+    worldBobber.visible = false;
+    castLine.visible = false;
+    bobber.visible = true;
+    rodLine.visible = true;
+    fishBtn.textContent = '🎣 던지기';
+    fishBtn.classList.remove('casting');
+  }
+
+  function startFishing() {
+    if (miniActive) return;
+    if (isCasting) {
+      stopFishing();
+      return;
+    }
+    var activeRodObj = (activeSlot === 2 && hasMimicryRod) ? mimicryGroup : rodGroup;
+    // 플레이어 정면 방향의 호수 수면 좌표 계산
+    var dirX = -Math.sin(yaw), dirZ = -Math.cos(yaw);
+    var tx = X + dirX * 10, tz = Z + dirZ * 10;
+    var distToLake = LD(tx, tz);
+    if (distToLake > LR * 0.88) {
+      // 호수 중심 쪽으로 보정하여 항상 물 위에 떨어지도록 설정
+      var toCenterX = LX - X, toCenterZ = LZ - Z;
+      var len = Math.hypot(toCenterX, toCenterZ) || 1;
+      tx = X + (toCenterX / len) * Math.min(12, Math.max(6, len - LR * 0.45));
+      tz = Z + (toCenterZ / len) * Math.min(12, Math.max(6, len - LR * 0.45));
+    }
+    isCasting = true;
+    castTime = 0;
+    activeRodObj.localToWorld(tipPos.set(0, 1.72, 0));
+    castStart.copy(tipPos);
+    castTarget.set(tx, LW + 0.02, tz);
+    bobber.visible = false;
+    rodLine.visible = false;
+    worldBobber.position.copy(castStart);
+    worldBobber.visible = true;
+    castLine.visible = true;
+    fishBtn.textContent = '🎣 회수하기';
+    fishBtn.classList.add('casting');
+
+    // 2번 특수 낚싯대는 던지면 바로 낚이고, 1번 일반 낚싯대는 5초 뒤에 낚임
+    if (biteTimer) clearTimeout(biteTimer);
+    var biteDelay = (activeSlot === 2 && hasMimicryRod) ? 180 : 5000;
+    biteTimer = setTimeout(function () {
+      biteTimer = null;
+      if (isCasting && !miniActive) startMinigame();
+    }, biteDelay);
+  }
+
+  fishBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    startFishing();
+  });
+
+  function selectSlot(num) {
+    if (num === 5) {
+      if (!bossSummoned) {
+        bossSummoned = true;
+        bossGroup.visible = true;
+        showToast('🎶 휘슬을 불자 호수 중앙에 의문의 캐릭터가 나타났습니다!');
+      } else {
+        bossSummoned = false;
+        bossGroup.visible = false;
+        if (isCasting) stopFishing();
+        showToast('🎶 휘슬을 다시 불자 호수 중앙의 캐릭터가 사라졌습니다.');
+      }
+      return;
+    }
+    if (num === 2 && !hasMimicryRod) return;
+    // 이미 선택된 슬롯을 다시 누르면 집어넣기(토글)
+    activeSlot = (activeSlot === num) ? 0 : num;
+    for (var i = 0; i < slots.length; i++) {
+      var s = Number(slots[i].getAttribute('data-slot'));
+      slots[i].classList.toggle('active', s === activeSlot);
+    }
+    stopFishing();
+    rodGroup.visible = (activeSlot === 1);
+    mimicryGroup.visible = (activeSlot === 2 && hasMimicryRod);
+    if (activeSlot === 1 || (activeSlot === 2 && hasMimicryRod)) {
+      equipAnim = 1;
+    }
+  }
+  function look(dx, dy) { yaw -= dx * 0.0022; pitch = Math.max(-1.4, Math.min(1.4, pitch - dy * 0.0022)); }
+  function loop(t) {
+    var dt = Math.min(0.05, (t - last) / 1000); last = t;
+    var f = miniActive ? 0 : ((K.KeyW ? 1 : 0) - (K.KeyS ? 1 : 0));
+    var r = miniActive ? 0 : ((K.KeyD ? 1 : 0) - (K.KeyA ? 1 : 0));
+    if (!miniActive) {
+      yaw += ((K.ArrowLeft || K.KeyQ ? 1 : 0) - (K.ArrowRight || K.KeyE ? 1 : 0)) * 1.9 * dt;
+      pitch = Math.max(-1.4, Math.min(1.4, pitch + ((K.ArrowUp ? 1 : 0) - (K.ArrowDown ? 1 : 0)) * 1.2 * dt));
+    }
+    var l = Math.hypot(f, r) || 1, sp = (K.ShiftLeft || K.ShiftRight) ? 11 : 6, ox = X, oz = Z;
+    X += (-Math.sin(yaw) * f + Math.cos(yaw) * r) / l * sp * dt; Z += (-Math.cos(yaw) * f - Math.sin(yaw) * r) / l * sp * dt;
+    X = Math.max(-37, Math.min(125, X)); Z = Math.max(-155, Math.min(130, Z));
+    if (LD(X, Z) < LR && H(X, Z) < 1.2) { X = ox; Z = oz; }
+    for (var i = 0; i < C.length; i++) { var c = C[i], dx = X - c.x, dz = Z - c.z, d = Math.hypot(dx, dz), m = c.r + 0.6; if (d < m && d > 0.001) { X = c.x + dx / d * m; Z = c.z + dz / d * m; } }
+    var gy = H(X, Z) + 1.7;
+    if (!miniActive && K.Space && ground) { vy = 7.5; ground = false; }
+    if (ground) Y += (gy - Y) * Math.min(1, dt * 14); else { vy -= 20 * dt; Y += vy * dt; if (Y <= gy) { Y = gy; vy = 0; ground = true; } }
+    var mv = ground && (f || r) ? 1 : 0; bob += dt * sp * 1.6 * mv;
+    camera.position.set(X, Y + Math.sin(bob) * 0.06 * mv, Z); camera.rotation.set(pitch, yaw, 0);
+    camera.updateMatrixWorld();
+
+    // NPC 거리 체크 및 시선 처리
+    var distToNpc = Math.hypot(X - npcPos.x, Z - npcPos.z);
+    npcGroup.rotation.y = Math.atan2(X - npcPos.x, Z - npcPos.z);
+    if (bossSummoned && bossGroup.visible) {
+      bossGroup.rotation.y = Math.atan2(X - LX, Z - LZ);
+      bossInner.position.y = Math.sin(t * 0.004) * 0.22;
+      bossInner.rotation.z = Math.sin(t * 0.003) * 0.06;
+    }
+    if (!miniActive && distToNpc <= 4.5) {
+      if (!dialogOpen) talkBtn.style.display = 'block';
+    } else {
+      talkBtn.style.display = 'none';
+      if (dialogOpen) {
+        npcDialog.style.display = 'none';
+        dialogOpen = false;
+      }
+    }
+
+    // 호수 앞 접근 여부 체크 (미니게임 중이 아닐 때만 버튼 표시 제어)
+    var nearLake = LD(X, Z) <= LR + 8.5;
+    var hasEquippedRod = (activeSlot === 1 || (activeSlot === 2 && hasMimicryRod));
+    if (!miniActive) {
+      if (hasEquippedRod && nearLake) {
+        fishBtn.style.display = 'block';
+      } else {
+        fishBtn.style.display = 'none';
+        if (isCasting && !nearLake) stopFishing();
+      }
+    }
+
+    // 낚싯대(1번 또는 2번 특수 낚싯대) 장착 애니메이션 및 걷기 흔들림
+    var currentRod = rodGroup.visible ? rodGroup : (mimicryGroup.visible ? mimicryGroup : null);
+    if (currentRod) {
+      equipAnim = Math.max(0, equipAnim - dt * 5);
+      var swayX = Math.cos(bob * 0.5) * 0.018 * mv;
+      var swayY = Math.abs(Math.sin(bob * 0.5)) * 0.022 * mv;
+      var castSwing = isCasting ? Math.max(0, 1 - castTime * 4) * 0.45 : 0;
+      var tugShake = miniActive ? Math.sin(t * 0.04) * 0.03 : 0;
+      currentRod.position.set(0.36 + swayX + tugShake, -0.52 - swayY - equipAnim * 0.25, -0.45);
+      currentRod.rotation.set(-0.55 - equipAnim * 0.45 - castSwing + Math.sin(bob * 0.5) * 0.03 * mv + tugShake, 0.18, 0.12);
+      currentRod.updateMatrixWorld();
+
+      // 던져진 찌와 낚싯줄 업데이트
+      if (isCasting) {
+        castTime += dt;
+        var p = Math.min(1, castTime / 0.45);
+        var ease = 1 - Math.pow(1 - p, 3);
+        var arc = Math.sin(p * Math.PI) * 2.4;
+        var bobWave = p >= 1 ? (miniActive ? Math.sin(t * 0.035) * 0.12 - 0.06 : Math.sin(t * 0.005) * 0.045) : 0;
+        worldBobber.position.set(
+          castStart.x + (castTarget.x - castStart.x) * ease,
+          castStart.y + (castTarget.y - castStart.y) * ease + arc + bobWave,
+          castStart.z + (castTarget.z - castStart.z) * ease
+        );
+        currentRod.localToWorld(tipPos.set(0, 1.72, 0));
+        var midX = (tipPos.x + worldBobber.position.x) * 0.5;
+        var midY = Math.min(tipPos.y, worldBobber.position.y) - (p >= 1 ? 0.35 : 0.1);
+        var midZ = (tipPos.z + worldBobber.position.z) * 0.5;
+        var posAttr = castLineGeo.attributes.position;
+        posAttr.setXYZ(0, tipPos.x, tipPos.y, tipPos.z);
+        posAttr.setXYZ(1, midX, midY, midZ);
+        posAttr.setXYZ(2, worldBobber.position.x, worldBobber.position.y + 0.08, worldBobber.position.z);
+        posAttr.needsUpdate = true;
+      }
+    }
+
+    // 낚시 미니게임 물리 및 게이지 업데이트
+    if (miniActive) {
+      var pressing = holdReel || K.Space || K.ArrowRight || K.KeyD;
+      var accel = pressing ? 155 : -145;
+      whiteVel += accel * dt;
+      whiteVel *= Math.pow(0.06, dt);
+      whitePos += whiteVel * dt;
+      if (whitePos < 0) { whitePos = 0; whiteVel = Math.max(0, -whiteVel * 0.3); }
+      // 흰색 바 안에 회색 바가 들어왔는지 판정 (보스 물고기는 게이지 차는 속도가 90% 느림)
+      var inside = (grayPos >= whitePos && grayPos <= whitePos + whiteWidth);
+      var fillRate = isBossFight ? (24 * 0.1) : 24;
+      if (inside) {
+        catchProgress += fillRate * dt;
+        fgWhite.style.boxShadow = '0 0 16px rgba(120,255,180,.9)';
+      } else {
+        catchProgress -= 14 * dt;
+        fgWhite.style.boxShadow = '0 0 12px rgba(255,255,255,.55)';
+      }
+
+      // 보스 물고기 노란색 기둥 공격 타이머
+      if (isBossFight) {
+        pillarTimer -= dt;
+        if (pillarTimer <= 0) {
+          pillarTimer = 3.6 + Math.random() * 1.2;
+          spawnYellowPillarAttack();
+        }
+      }
+
+      fgWhite.style.left = whitePos + '%';
+      fgGray.style.left = grayPos + '%';
+      fgProg.style.width = Math.max(0, Math.min(100, catchProgress)) + '%';
+
+      if (catchProgress >= 100) endMinigame(true);
+      else if (catchProgress <= 0) endMinigame(false);
+    }
+
+    if (clouds) clouds.position.x += dt * 2;
+    renderer.render(scene, camera); requestAnimationFrame(loop);
+  }
+  function startGame() {
+    if (running || !ready) return; running = true;
+    stage.classList.add('out'); game.classList.add('on');
+    requestAnimationFrame(function () { game.classList.add('vis'); });
+    if (touch) pad.style.display = 'grid';
+    setTimeout(function () { help.style.opacity = 0; }, 8000);
+    last = performance.now(); requestAnimationFrame(loop);
+  }
+  stage.addEventListener('click', startGame);
+  addEventListener('keydown', function (e) {
+    K[e.code] = true;
+    if (e.code === 'Space') e.preventDefault();
+    if (!e.repeat && /^Digit[1-5]$/.test(e.code)) selectSlot(Number(e.code.slice(5)));
+  });
+  addEventListener('keyup', function (e) { K[e.code] = false; });
+  addEventListener('blur', function () { K = {}; });
+  addEventListener('resize', function () { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+  var lp = null, cv = renderer.domElement, hotbar = document.getElementById('hotbar');
+  game.addEventListener('pointerdown', function (e) {
+    if (miniActive) { holdReel = true; return; }
+    if (pad.contains(e.target) || hotbar.contains(e.target) || fishBtn.contains(e.target) || shopHud.contains(e.target) || talkBtn.contains(e.target) || npcDialog.contains(e.target)) return; lp = e;
+    try { game.setPointerCapture(e.pointerId); } catch (x) {}
+  });
+  game.addEventListener('dblclick', function (e) {
+    if (miniActive || pad.contains(e.target) || hotbar.contains(e.target) || fishBtn.contains(e.target) || shopHud.contains(e.target) || talkBtn.contains(e.target) || npcDialog.contains(e.target)) return;
+    try { var q = cv.requestPointerLock(); if (q && q.catch) q.catch(function () {}); } catch (x) {}
+  });
+  game.addEventListener('pointermove', function (e) {
+    if (miniActive) return;
+    if (document.pointerLockElement === cv) look(e.movementX, e.movementY);
+    else if (lp && !pad.contains(e.target) && !hotbar.contains(e.target) && !fishBtn.contains(e.target) && !shopHud.contains(e.target) && !talkBtn.contains(e.target) && !npcDialog.contains(e.target)) {
+      // 왼쪽으로 드래그(clientX 감소)하면 왼쪽 회전, 오른쪽으로 드래그(clientX 증가)하면 오른쪽 회전
+      var m = e.pointerType === 'touch' ? 1.6 : 1;
+      look((e.clientX - lp.clientX) * m, (e.clientY - lp.clientY) * m);
+      lp = e;
+    }
+  });
+  ['pointerup', 'pointercancel'].forEach(function (n) { game.addEventListener(n, function () { lp = null; holdReel = false; }); });
+  Array.prototype.forEach.call(slots, function (el) {
+    el.addEventListener('pointerdown', function (e) {
+      e.stopPropagation();
+      selectSlot(Number(el.getAttribute('data-slot')));
+    });
+  });
+  Array.prototype.forEach.call(pad.querySelectorAll('button'), function (b) {
+    var c = b.getAttribute('data-k');
+    b.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); K[c] = true; });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (n) { b.addEventListener(n, function () { K[c] = false; }); });
+  });
+})();
+</script>
+</body>
+</html>
